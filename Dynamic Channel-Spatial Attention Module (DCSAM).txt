@@ -1,0 +1,27 @@
+    # Channel attention branch
+    self.channel_attention = nn.Sequential(
+        nn.AdaptiveAvgPool2d(1),
+        nn.Conv2d(in_channels, in_channels//reduction_ratio, kernel_size=1),
+        nn.ReLU(inplace=True),
+        nn.Conv2d(in_channels//reduction_ratio, in_channels, kernel_size=1),
+        nn.Sigmoid()
+    )
+    
+    # Spatial attention branch
+    self.spatial_attention = nn.Sequential(
+        nn.Conv2d(2, 1, kernel_size=3, padding=1),
+        nn.Sigmoid()
+    )
+    
+def forward(self, x):
+    # Channel attention weights
+    channel_weights = self.channel_attention(x)
+    
+    # Spatial attention weights
+    avg_pool = torch.mean(x, dim=1, keepdim=True)
+    max_pool = torch.max(x, dim=1, keepdim=True)[0]
+    spatial_weights = self.spatial_attention(torch.cat([avg_pool, max_pool], dim=1))
+    
+    # Dynamic fusion of channel and spatial attention
+    out = x * channel_weights * spatial_weights
+    return out

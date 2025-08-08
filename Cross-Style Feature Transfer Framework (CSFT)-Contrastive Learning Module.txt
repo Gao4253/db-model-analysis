@@ -1,0 +1,40 @@
+class ContrastiveLearningModule(nn.Module):
+def init(self, feat_dim=256, temperature=0.1):
+super().init()
+self.temperature = temperature
+self.projector = nn.Sequential(
+nn.Linear(feat_dim, feat_dim),
+nn.ReLU(),
+nn.Linear(feat_dim, feat_dim)
+)
+def forward(self, features, labels):
+    """
+    Args:
+        features: [B, D] feature vectors
+        labels: [B] class labels
+    Returns:
+        contrastive_loss: computed contrastive loss
+    """
+    # Feature projection
+    z = self.projector(features)  # [B, D]
+    z = nn.functional.normalize(z, dim=1)  # L2 normalization
+    
+    # Compute similarity matrix
+    sim_matrix = torch.mm(z, z.T) / self.temperature  # [B, B]
+    
+    # Create positive/negative masks
+    pos_mask = torch.eq(labels.unsqueeze(1), labels.unsqueeze(0)).float()  # [B, B]
+    neg_mask = 1 - pos_mask
+    
+    # Compute contrastive loss with numerical stability
+    logits_max, _ = torch.max(sim_matrix, dim=1, keepdim=True)
+    sim_matrix = sim_matrix - logits_max.detach()
+    
+    exp_sim = torch.exp(sim_matrix)
+    log_prob = sim_matrix - torch.log(exp_sim.sum(dim=1, keepdim=True))
+    
+    # Average log-likelihood for positive pairs
+    pos_log_prob = (log_prob * pos_mask).sum(dim=1) / pos_mask.sum(dim=1)
+    contrastive_loss = -pos_log_prob.mean()
+    
+    return contrastive_loss
